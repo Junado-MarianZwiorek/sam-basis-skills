@@ -2,6 +2,18 @@
 
 Plugin fuer Claude Code mit vier Skills fuer Session-Kontext-Management und Vault-Indexierung — plus optional vier externe Skills auf Wunsch.
 
+## Quickstart — Install in 3 Zeilen
+
+In Claude Code auf einem neuen Rechner einfach diese drei Zeilen einfuegen:
+
+```
+/plugin marketplace add Junado-MarianZwiorek/sam-basis-skills
+/plugin install sam-basis-skills@sam-basis
+/setup-context
+```
+
+Der Setup-Wizard fragt dann Workspace + Vault-Pfad ab und schreibt die Config. Fertig.
+
 ## Skills
 
 | Skill | Zweck |
@@ -11,15 +23,40 @@ Plugin fuer Claude Code mit vier Skills fuer Session-Kontext-Management und Vaul
 | `/spike` | Vault-Notiz indizieren (Frontmatter + zentraler `SPIKES.md`-Index) |
 | `/setup-context` | Erst-Setup-Wizard — fragt Pfade ab, schreibt Config |
 
-## Installation
+## Installation — ausfuehrliche Variante
 
-1. Plugin installieren (z.B. `/plugin install <pfad-oder-url>`)
-2. **`/setup-context` einmal ausfuehren** — der Wizard fragt:
-   - Workspace-Root (Ordner mit Projekt-Unterordnern)
-   - Wissens-Vault: vorhanden / nicht vorhanden / neu anlegen (Minimal-Template)
-   - Optionale Workspace-`CLAUDE.md` fuer TEMPORAER-Bloecke
-   - Optionale externe Skills (siehe unten)
-3. Fertig. Die anderen Skills lesen die Config automatisch.
+Falls der Quickstart oben nicht reicht oder du eigene Marketplace-Settings pflegst:
+
+**A) Ueber Slash-Befehle (Standard):**
+
+```
+/plugin marketplace add Junado-MarianZwiorek/sam-basis-skills
+/plugin install sam-basis-skills@sam-basis
+```
+
+**B) Ueber `~/.claude/settings.json` (manuell):**
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "sam-basis": {
+      "source": {
+        "source": "github",
+        "repo": "Junado-MarianZwiorek/sam-basis-skills"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "sam-basis-skills@sam-basis": true
+  }
+}
+```
+
+**Nach Install — egal welcher Weg:** `/setup-context` ausfuehren. Der Wizard fragt:
+- Workspace-Root (Ordner mit Projekt-Unterordnern)
+- Wissens-Vault: vorhanden / nicht vorhanden / neu anlegen (Minimal-Template)
+- Optionale Workspace-`CLAUDE.md` fuer TEMPORAER-Bloecke
+- Optionale externe Skills (siehe unten)
 
 ## Konzept
 

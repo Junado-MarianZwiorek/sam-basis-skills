@@ -1,0 +1,9 @@
+{
+  "name": "sam-basis-skills",
+  "version": "0.1.0",
+  "description": "Session-Kontext + Vault-Indexierung: save-context, load-context, spike. Inklusive Setup-Wizard und optionaler externer Skills (html, prompt-master, obsidian-skills, remotion-best-practices).",
+  "author": {
+    "name": "Marian Zwiorek"
+  },
+  "keywords": ["context", "vault", "obsidian", "session", "spike"]
+}

@@ -1,0 +1,22 @@
+[
+  {
+    "name": "html",
+    "url": "https://github.com/zarazhangrui/frontend-slides",
+    "desc": "HTML-Praesentationen aus Markdown/PPT erstellen"
+  },
+  {
+    "name": "prompt-master",
+    "url": "https://github.com/nidhinjs/prompt-master",
+    "desc": "Prompt-Optimierung fuer LLMs"
+  },
+  {
+    "name": "obsidian-skills",
+    "url": "https://github.com/kepano/obsidian-skills",
+    "desc": "Vault-Tools (Markdown, Bases, JSON-Canvas, CLI)"
+  },
+  {
+    "name": "remotion-best-practices",
+    "url": "https://skills.sh/remotion-dev/skills/remotion-best-practices",
+    "desc": "React-Video Best Practices (Remotion)"
+  }
+]

@@ -1,0 +1,15 @@
+{
+  "name": "sam-basis",
+  "owner": {
+    "name": "Marian Zwiorek"
+  },
+  "plugins": [
+    {
+      "name": "sam-basis-skills",
+      "source": "./",
+      "description": "Session-Kontext + Vault-Indexierung: save-context, load-context, spike. Inklusive Setup-Wizard und optionaler externer Skills.",
+      "version": "0.1.0",
+      "category": "productivity"
+    }
+  ]
+}

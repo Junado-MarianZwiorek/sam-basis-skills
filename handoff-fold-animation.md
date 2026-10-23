@@ -206,3 +206,94 @@ Alle Gyro-Effekte sind additiv und klein; die Kernanimation (Blur/Dim/Sweep nach
 - [ ] Kein Element bewegt oder skaliert sich in irgendeiner Phase.
 - [ ] Unterbrechen (halb auf, wieder zu) erzeugt keine Sprünge.
 - [ ] Gyro-Effekte an/aus unterscheidbar, aber nie dominant; Reduce-Motion → reines 2D.
+
+---
+
+## 9. Ergänzungen aus Video 2 (MKBHD-Short, Gerät schräg von oben gefilmt, Person steht)
+
+> Zweites Video: 21 s, 1080×1708, ~29,6 fps, 619 Frames, 3× Auf-/Zuklappen. Anderes Concept-Rendering
+> (helles Wallpaper, Widgets „Sleep“/„Calendar“ oben, 4×4-Grid, vertikales Dock rechts mit Phone/Safari/
+> Messages/Music, Suche-Button unten rechts). Grundmechanik identisch zu Abschnitt 1–5. Die Punkte unten sind
+> **zusätzlich** sichtbar bzw. weichen ab. Wo beide Videos sich widersprechen, steht es dabei – die Ziel-Session
+> soll die mit „empfohlen“ markierte Variante bauen und die andere als Flag anbieten.
+
+### 9.1 Cover: Dock bleibt scharf [beobachtet, Video 2]
+- Das vertikale Dock am rechten Rand (Phone, Safari, Messages, Music) und der Such-Button unten rechts werden
+  **nie** geblurrt – weder beim Auf- noch beim Zuklappen. Sie stehen scharf auf dem verschwommenen Rest, wie die Statusbar.
+- Video 1 blurrt das Dock mit. **Empfohlen: Dock ausnehmen** (Flag `coverDockExempt = true`), weil es die
+  „Orientierung bleibt, Inhalt geht“-Logik der Statusbar konsequent fortführt.
+
+### 9.2 Cover: Abdunklung ist ein Gradient von der Hinge-Seite [beobachtet, Video 2]
+- Beim Aufklappen wird der Cover-Content nicht gleichmäßig dunkler, sondern von der **Hinge-Kante (links)
+  her**: Bei θ ≈ 10° ist das linke Drittel deutlich grau-dunkel, das rechte Drittel noch hell; bei θ ≈ 30°+
+  reicht der dunkle Verlauf bis ~70 % der Breite. Dock und Statusbar bleiben hell.
+- Beim Zuklappen umgekehrt: Das Cover taucht mit genau diesem Hinge-seitigen Dunkel-Verlauf auf
+  (linke Hälfte fast schwarz, rechte Hälfte grau-verwaschen, Dock scharf) und der Verlauf **zieht sich nach dem
+  Schließen in ~200 ms zur Hinge-Kante zurück**, bevor/während der Schärfe-Sweep (Abschnitt 5) läuft.
+- Lesart [abgeleitet]: Das ist der **Schatten des gegenüberliegenden Panels**, das über dem Cover steht. Breite
+  und Dichte des Schattens sind damit direkt eine Funktion von θ. Das ersetzt den pauschalen `dimAlpha = 0.12*q`
+  aus 6.3 durch:
+  ```
+  shadowWidth = 0.75 * clamp(θ / 35, 0, 1)                 // Anteil der Cover-Breite, von der Hinge-Kante aus
+  shadowAt(x) = 0.55 * (1 - smoothstep(0, shadowWidth, x)) // x=0 Hinge-Kante, 0.55 = max. Abdunklung an der Kante
+  // Zuklappen, nach Schließen: shadowWidth → 0 in 200 ms easeOut
+  ```
+  Dock/Statusbar sind von `shadowAt` ausgenommen.
+
+### 9.3 Cover: Blur-Onset ist schneller [beobachtet, Video 2]
+- Blur setzt bei θ ≈ 2–3° ein und ist nach ~0,25 s (θ ≈ 15°) komplett. Video 1: ~0,45 s bis θ ≈ 25°.
+- Empfehlung: `q = clamp((θ - 2) / 15, 0, 1)` statt `(θ - 3) / 22`. Der Sweep (außen → Hinge) ist bei dieser
+  Geschwindigkeit kaum noch als Front wahrnehmbar, aber vorhanden; beibehalten.
+
+### 9.4 Cover: Statusbar-Uhrzeit blendet beim Zuklappen spät ein [beobachtet, Video 2, mittlere Sicherheit]
+- Beim Zuklappen ist die Uhrzeit oben rechts („1:21“ + WLAN) in den ersten ~400 ms nach Erscheinen des Covers
+  **nicht** sichtbar und blendet erst mit dem Ende des Schärfe-Sweeps ein. Beim Aufklappen bleibt sie durchgehend.
+- Video 1 zeigt die Statusbar beim Zuklappen sofort. Empfohlen: Statusbar **mit dem Schärfe-Sweep einblenden**
+  (Fade 150 ms, startet bei `s ≈ 0.6`), weil das die Lesbarkeit erst dann herstellt, wenn auch die Uhr-Widgets lesbar sind.
+  Flag `coverStatusFadeOnClose`.
+
+### 9.5 Innen, linkes Panel: Helligkeit kommt als Lichtfront von der Hinge-Kante [beobachtet, Video 2]
+- Zwischen θ ≈ 60° und 160° ist das linke Panel nicht gleichmäßig dunkel-unscharf, sondern:
+  - **nahe der Hinge-Kante ein heller, verwaschener Streifen**, der mit wachsendem θ nach außen wandert,
+  - **außen (linke Screen-Kante) dunkelgrau**, zuletzt nur noch die äußerste Ecke oben links / unten links dunkel,
+  - bei θ ≈ 160° ist die Lichtfront am Außenrand, nur noch Blur bleibt (→ Abschnitt 3, letzte 25°).
+- Beim Zuklappen läuft die Dunkelfront vom Außenrand zur Hinge-Kante hin zurück.
+- Das präzisiert die „Vignette“-Bemerkung in Abschnitt 3. Implementierung (ersetzt `dimAlpha` für `leftPanel` in 6.3):
+  ```
+  lightFront = clamp((θ - 60) / 100, 0, 1)                      // 0 bei 60°, 1 bei 160°
+  dimAt(x)   = 0.6 * smoothstep(lightFront - 0.25, lightFront + 0.05, 1 - x)   // x=0 Hinge-Kante, x=1 Außenkante
+  // zusätzlich globales dim 0.1 * (1 - e) aus 6.3 behalten
+  ```
+  Front-Breite ≈ 30 % Panel-Breite, sehr weich.
+
+### 9.6 Innen: Blur-Kante am Knick wandert mit θ [beobachtet, Video 2, bestätigt Beobachtung in Video 1]
+- Bei θ ≈ 80° ist die hinge-nächste Spalte des rechten Panels (Sleep-Widget, FaceTime, Mail, Siri, Shortcuts)
+  leicht weich; bei θ ≈ 110° ist sie scharf. Die Maskenkante startet also ~eine halbe Icon-Breite **rechts** vom
+  Knick und wandert bis θ ≈ 110° auf ~eine halbe Icon-Breite **links** vom Knick, wo sie dann stehen bleibt.
+  ```
+  maskEdgeX = hingeX + iconW * (0.5 - clamp((θ - 60) / 50, 0, 1))
+  ```
+
+### 9.7 Innen: Kein Element bewegt sich – Bestätigung mit Vorbehalt [beobachtet, Video 2]
+- Auch in Video 2 ist keine Translation erkennbar. Beim Entschärfen des linken Panels (θ 165°→180°) wirken die
+  weißen Widget-Flächen minimal größer als ihr scharfer Endzustand (≤ 5 %). Das kann Blur-Ausbreitung sein.
+  Empfehlung: **keine Skalierung bauen**; optional Flag `leftPanelSettleScale = 1.03 → 1.0` über die letzten 15°, default aus.
+
+### 9.8 Was Video 2 für die Gyro-Perspektive liefert [beobachtet + abgeleitet]
+- Die Kamera blickt schräg von oben; dadurch ist sichtbar, dass die Dunkel-Verläufe (9.2, 9.5) **immer parallel
+  zur Hinge-Achse** liegen und sich nicht nach der Kamera richten. Das ist ein Rendering, kein echter Schatten –
+  aber die Lesart „Schatten des anderen Panels“ ist genau der Hebel für den Gyro-Teil aus Abschnitt 7:
+  - Lichtquelle = „oben“ laut Gravity-Vektor `g`. Der Schatten auf dem Cover (9.2) wird breiter, wenn das
+    aufgeklappte Panel laut `g` **über** dem Cover steht (Gerät wird nach unten gehalten, wie in Video 2), und
+    schmaler, wenn es darunter steht (Gerät über Kopf). Faktor 0.7–1.3 auf `shadowWidth`, Low-Pass 0,3 s.
+  - Die Lichtfront auf dem linken Innen-Panel (9.5) bekommt denselben Faktor invers.
+  - Beides ist [Extrapolation], additiv, mit Reduce-Motion abschaltbar; ohne Gyro gilt exakt 9.2/9.5.
+
+### 9.9 Ergänzung Abnahme-Checkliste
+- [ ] Cover: Dock + Suche-Button bleiben in jeder Phase scharf (Flag).
+- [ ] Cover beim Aufklappen: Abdunklung beginnt an der Hinge-Kante, Dock/Statusbar bleiben hell.
+- [ ] Cover beim Zuklappen: Dunkel-Verlauf an der Hinge-Kante, zieht sich in ~200 ms zurück, dann Schärfe-Sweep.
+- [ ] Cover: Blur bei θ ≈ 15° komplett.
+- [ ] Innen linkes Panel: heller Streifen wandert von der Hinge-Kante nach außen (60°→160°), Außen-Ecken zuletzt hell.
+- [ ] Innen: Maskenkante wandert zwischen 60° und 110° von rechts nach links über den Knick.
+- [ ] Gyro: Schattenbreite reagiert auf „Panel über/unter Cover“ laut Gravity, nie mehr als ±30 %.

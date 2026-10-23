@@ -1,5 +1,7 @@
 # Handoff: Fold-Animation „iPhone Duo“-Style für eigenen Launcher
 
+> **v2.3:** Grundregel ergänzt: **Jede Animation ist eine stetige Funktion des Hinge-Winkels θ.** Keine Timer, keine Mindestdauern, keine Nachlauf-Animationen nach dem Schließen. Cover-Blur beim Öffnen läuft jetzt über 2°–40° mit wachsender Stärke (6.3). Cover-Entschärfung beim Schließen ist auf θ gemappt (5, 6.3), die im Video gemessene Zeitkomponente steht nur noch als Beobachtung.
+>
 > **v2.2:** Neuer Abschnitt 10 (Parallaxe / Bewegung der Apps, per Tracking gemessen) und Abschnitt 11 (weitere Details aus Video 1). Abschnitt 7 (Gyro) ist auf „niedrige Priorität, optional“ zurückgestuft.
 >
 > **Korrektur-Hinweis (v2.1):** Die vier `smoothstep`-Formeln in 6.3 hatten vertauschte Kanten (e0 > e1). Jetzt mit `1 - smoothstep(...)` und Prüfwerten. Verhalten laut Text war schon richtig.
@@ -153,6 +155,16 @@ Ecken des Covers beim Zuklappen:
 
 ## 6. Implementierungs-Spezifikation (für den Launcher) [abgeleitet]
 
+### 6.0 Grundregel (Vorgabe des Auftraggebers)
+**Alles hängt durchgehend vom geöffneten Winkel θ ab.** Blur-Radius, Maskenfront, Helligkeit, Lichtfront und
+Maskenkante sind reine Funktionen von θ. Es gibt **keine** Timer, **keine** Mindest- oder Höchstdauern,
+**keine** Animationen, die nach Erreichen von 0° oder 180° weiterlaufen, und **keinen** Zustand, der sich
+merkt, ob gerade geöffnet oder geschlossen wird. Reißt der Nutzer das Gerät in 0,2 s auf, läuft der Verlauf in
+0,2 s; hält er es bei 25° an, bleibt der Verlauf bei 25° stehen. Dreht er zurück, läuft er rückwärts.
+Die einzige zeitliche Komponente ist die Sensor-Glättung von θ (Low-Pass, ~30–50 ms), damit Jitter nicht
+sichtbar flackert. Damit der Verlauf trotzdem nicht als Sprung wirkt, muss er über **genug Grad** verteilt
+sein (siehe Cover-Werte unten), nicht über Zeit gestreckt werden.
+
 ### 6.1 Eingangsgrößen
 ```
 θ        Hinge-Winkel 0..180 (geglättet, Low-Pass 60–90 Hz, kein Jitter)
@@ -201,25 +213,41 @@ blurWeight(x_px) = 1 - smoothstep(maskEdgeX - 0.07 * screenW, maskEdgeX, x_px)  
 
 **Cover-Screen beim Aufklappen (winkelgetrieben + Sweep, Hinge rechts):**
 ```
-q = clamp((θ - 2) / 15, 0, 1)                          // 2°..17° → 0..1 (Video 2); Video 1 wäre (θ-3)/22
+q = clamp((θ - 2) / 38, 0, 1)                          // 2°..40° → 0..1
 frontX = q * 1.35                                      // Blur-Front läuft von x=0 (Hinge) nach x>1 (außen)
-blurAt(x) = BLUR_MAX_COVER * (1 - smoothstep(frontX - 0.35, frontX, x))   // unscharf hinter der Front (x < frontX), 35 % weiche Zone; bei q=0 überall 0
+strength = 0.3 + 0.7 * q                               // direkt hinter der Front anfangs nur 30 % Radius, am Ende 100 %
+blurAt(x) = BLUR_MAX_COVER * strength * (1 - smoothstep(frontX - 0.35, frontX, x))   // bei q=0 überall 0
+// Begründung: In Video 1 ist das Cover bei ~30–35° voll unscharf (Frame 158), Video 2 bei ~15–17°. Der
+// schnelle Wert aus Video 2 wirkt beim Nachbau als Sprung, weil die ersten 17° in einem Augenblick vorbei
+// sind. 40° mit wachsender Stärke deckt beide Videos ab und bleibt eine reine Funktion von θ.
+// Falls es zu träge wirkt: 30° statt 40°, sonst nichts ändern. Keine Zeit-Untergrenze einbauen.
 ```
-BLUR_MAX_COVER ≈ 24 dp. Gilt für den gesamten Layer inkl. Statusbar und Dock. Ab θ > ~20° bleibt der
+BLUR_MAX_COVER ≈ 24 dp. Gilt für den gesamten Layer inkl. Statusbar und Dock. Ab θ ≥ 40° bleibt der
 Endzustand, bis der Screen ausgeht.
 
-**Cover-Screen beim Zuklappen (zeitgetrieben nach Schließen):**
+**Cover-Screen beim Zuklappen (winkelgetrieben, auf die letzten Grad gemappt):**
 ```
-// Phase A, θ 25°→0°: Cover an, brightness 0.15, Blur max, kein Sweep
-// Phase B, t_closed:
-brightness = 0.15 + 0.85 * easeOutCubic(clamp(t_closed / 200ms))
-s = easeOutCubic(clamp((t_closed - 100ms) / 500ms))
+// Cover wird bei θ ≤ 40° eingeschaltet (symmetrisch zum Öffnen), zunächst dunkel und voll unscharf.
+brightness = 0.15 + 0.85 * smoothstep(30, 8, θ)        // dunkel bei ≥30°, voll hell ab 8°
+s = smoothstep(25, 0, θ)                               // Schärfe-Fortschritt 0 bei 25°, 1 bei 0°
 frontX = 1.35 - s * 1.35                                // Schärfe-Front läuft von außen (x=1) zur Hinge-Kante (x=0)
 blurAt(x) = BLUR_MAX_COVER * (1 - smoothstep(frontX - 0.35, frontX, x))   // bei s=0 überall unscharf, bei s=1 überall scharf
+// smoothstep(a, b, θ) mit a > b ist hier als 1 - smoothstep(b, a, θ) zu lesen (fallende Rampe).
 ```
-Wenn der Nutzer vor Ende von Phase B wieder öffnet: aktuellen Blur-Zustand als Startwert übernehmen, keine Sprünge.
+Weil das Cover-Öffnen über 2°–40° und das Cover-Schließen über 25°–0° läuft, sind Hin- und Rückweg nicht
+dieselbe Kurve. Das ist gewollt und entspricht den Videos (Öffnen: Blur-Front Hinge→außen; Schließen:
+Schärfe-Front außen→Hinge). Beim Richtungswechsel mitten im Verlauf gilt immer die Formel der aktuellen
+Bewegungsrichtung, mit θ als einziger Eingabe; weil beide bei θ=0 scharf und bei θ≥40° voll unscharf sind,
+gibt es an den Enden keinen Sprung. Dazwischen ist ein kleiner Sprung beim Umkehren akzeptiert.
+
+**Abweichung zum Video [beobachtet]:** In beiden Videos ist das Gerät bei Beginn der Entschärfung bereits
+geschlossen und die Entschärfung läuft danach noch ~0,5 s weiter (Abschnitt 5). Das wäre zeitgetrieben. Der
+Auftraggeber will durchgehend winkelgetrieben; deshalb ist der Verlauf oben auf die letzten 25° gelegt. Wer
+es exakt wie im Video will, muss die Entschärfung über eine Zeitrampe nach θ<1° laufen lassen; das ist
+**nicht** die Vorgabe.
 
 ### 6.4 Was NICHT passiert (bewusst weglassen)
+- Keine Timer, keine Mindestdauern, keine Nachlauf-Animationen (6.0).
 - Kein Scale/Translate/Parallax der Icons, Widgets, des Docks oder des Wallpapers (per Tracking bestätigt, Abschnitt 10).
 - Kein Cross-Fade zwischen zwei unterschiedlichen Layouts.
 - Keine Hinge-Linie, kein Schatten entlang der Knicklinie, keine Lichtkante.
@@ -257,14 +285,16 @@ Alle Gyro-Effekte sind additiv und klein; die Kernanimation darf sich durch Halt
 
 - [ ] Aufklappen Cover: Uhr-Widget und Statusbar (Hinge-Seite, rechts) blurren vor dem Wetter-Widget (außen, links).
 - [ ] Aufklappen Cover: **nichts** bleibt scharf, auch nicht Statusbar oder Dock.
-- [ ] Aufklappen Cover: komplett unscharf bei θ ≈ 15–25°.
+- [ ] Aufklappen Cover: komplett unscharf bei θ ≈ 40°.
 - [ ] Innen bei θ ≈ 90°: rechtes Panel 1:1 Cover-Layout, scharf inkl. Statusbar/Dock; linkes Panel dunkel + maximal unscharf.
 - [ ] Innen: Maskenkante wandert zwischen 60° und 110° von knapp rechts nach knapp links des Knicks; linke Icon-Spalte danach scharf.
 - [ ] Innen: heller Streifen wandert von der Hinge-Kante nach außen (60°→160°), Außen-Ecken zuletzt hell.
 - [ ] Innen: Widget-Farben bluten im Blur über Widget-Grenzen bis zum Panel-Rand.
 - [ ] Innen: Entschärfung fast komplett in den letzten 25° vor 180°.
 - [ ] Zuklappen: linkes Panel blurrt ab dem ersten Grad unter 180°.
-- [ ] Zuklappen Cover: kommt dunkel, hellt in ~200 ms auf, Schärfe-Sweep von außen (links) zur Hinge-Kante (rechts) über ~500 ms **nach** dem Schließen.
+- [ ] Zuklappen Cover: kommt bei ≤40° dunkel, wird bis 8° hell, Schärfe-Sweep von außen (links) zur Hinge-Kante (rechts) über 25°→0°.
+- [ ] Gerät bei beliebigem Winkel anhalten → Bild friert exakt ein, nichts läuft weiter. Zurückdrehen → läuft rückwärts.
+- [ ] Aufklappen Cover: Verlauf über 2°–40°, Stärke wächst mit; bei ruckartigem Öffnen kein Sprung, nur schnell.
 - [ ] Zuklappen Cover: Wetter-Widget scharf vor Uhr-Widget; Statusbar und Dock unter den letzten scharfen Elementen.
 - [ ] Kein Element bewegt oder skaliert sich in irgendeiner Phase.
 - [ ] Unterbrechen (halb auf, wieder zu) erzeugt keine Sprünge.

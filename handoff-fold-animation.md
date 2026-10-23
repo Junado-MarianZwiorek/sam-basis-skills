@@ -1,5 +1,7 @@
 # Handoff: Fold-Animation „iPhone Duo“-Style für eigenen Launcher
 
+> **Korrektur-Hinweis (v2.1):** Die vier `smoothstep`-Formeln in 6.3 hatten vertauschte Kanten (e0 > e1). Jetzt mit `1 - smoothstep(...)` und Prüfwerten. Verhalten laut Text war schon richtig.
+>
 > **Korrektur-Hinweis (v2):** Frühere Versionen dieses Dokuments behaupteten, Statusbar und Dock des
 > **Cover-Screens** blieben beim Falten scharf. Das ist falsch. Die scharfen Elemente, die in den Videos neben
 > dem verschwommenen Cover zu sehen sind, gehören zum **Innen-Screen** (rechtes Panel), das beim Klappen
@@ -174,6 +176,9 @@ immer auf dem **ganzen Panel-Layer** rechnen, erst danach mit Screen-Rundung cli
 ### 6.3 Kurven
 
 Koordinaten: `x` = 0 an der Hinge-Kante, 1 an der Außenkante, jeweils des betroffenen Screens/Panels.
+`smoothstep(e0, e1, x)` immer mit e0 < e1 (GLSL-Semantik); Richtungsumkehr nur über `1 - smoothstep(...)`.
+Prüfwerte: Cover-Aufklappen q=0 → Blur überall 0, q=1 → überall max. Cover-Zuklappen s=0 → überall max, s=1 → 0.
+Innen lightFront=0 → Hinge-Kante hell, Rest dunkel; lightFront=1 → überall hell.
 
 **Innen-Screen, linkes Panel (winkelgetrieben, symmetrisch auf/zu):**
 ```
@@ -182,20 +187,21 @@ e = p^3                                 // stark ease-in: fast alles in den letz
 blurRadius = BLUR_MAX_INNER * (1 - e)   // BLUR_MAX_INNER ≈ 48 dp
 
 lightFront = clamp((θ - 60) / 100, 0, 1)                           // 0 bei 60°, 1 bei 160°
-dimAt(x)   = 0.6 * smoothstep(lightFront - 0.25, lightFront + 0.05, x) // hell von der Hinge-Kante nach außen
+f = lightFront * 1.3
+dimAt(x)   = 0.6 * smoothstep(f - 0.25, f + 0.05, x)   // 0 (hell) an der Hinge-Kante, 0.6 (dunkel) jenseits der Front; bei 160° überall 0
            + 0.1 * (1 - e)                                           // globaler Rest
 ```
 Maskenkante am Knick (`iconW` = Icon-Rasterbreite):
 ```
 maskEdgeX = hingeX + iconW * (0.5 - clamp((θ - 60) / 50, 0, 1))   // wandert von rechts nach links über den Knick
-blurWeight(x_px) = smoothstep(maskEdgeX, maskEdgeX - 0.07 * screenW, x_px)
+blurWeight(x_px) = 1 - smoothstep(maskEdgeX - 0.07 * screenW, maskEdgeX, x_px)   // 1 links der Kante (Blur), 0 rechts davon
 ```
 
 **Cover-Screen beim Aufklappen (winkelgetrieben + Sweep, Hinge rechts):**
 ```
 q = clamp((θ - 2) / 15, 0, 1)                          // 2°..17° → 0..1 (Video 2); Video 1 wäre (θ-3)/22
 frontX = q * 1.35                                      // Blur-Front läuft von x=0 (Hinge) nach x>1 (außen)
-blurAt(x) = BLUR_MAX_COVER * smoothstep(frontX, frontX - 0.35, x)   // 35 % Breite weiche Front
+blurAt(x) = BLUR_MAX_COVER * (1 - smoothstep(frontX - 0.35, frontX, x))   // unscharf hinter der Front (x < frontX), 35 % weiche Zone; bei q=0 überall 0
 ```
 BLUR_MAX_COVER ≈ 24 dp. Gilt für den gesamten Layer inkl. Statusbar und Dock. Ab θ > ~20° bleibt der
 Endzustand, bis der Screen ausgeht.
@@ -207,7 +213,7 @@ Endzustand, bis der Screen ausgeht.
 brightness = 0.15 + 0.85 * easeOutCubic(clamp(t_closed / 200ms))
 s = easeOutCubic(clamp((t_closed - 100ms) / 500ms))
 frontX = 1.35 - s * 1.35                                // Schärfe-Front läuft von außen (x=1) zur Hinge-Kante (x=0)
-blurAt(x) = BLUR_MAX_COVER * smoothstep(frontX - 0.35, frontX, x)
+blurAt(x) = BLUR_MAX_COVER * (1 - smoothstep(frontX - 0.35, frontX, x))   // bei s=0 überall unscharf, bei s=1 überall scharf
 ```
 Wenn der Nutzer vor Ende von Phase B wieder öffnet: aktuellen Blur-Zustand als Startwert übernehmen, keine Sprünge.
 

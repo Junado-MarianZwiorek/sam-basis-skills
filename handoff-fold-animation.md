@@ -1,5 +1,9 @@
 # Handoff v3: Fold-Animation „iPhone Duo“ für den eigenen Launcher
 
+> **v3.1:** Blur als Verlauf proportional zum Abstand vom Knick (statt Front), Parallaxe als Strahl-Projektion
+> nach dem Vorbild öffentlicher Nachbauten, gegen die Messung geprüft. Neu: Abschnitt 8 (Internet-Quellen) und
+> der Hinweis zum Klappwinkel-Sensor des Galaxy Z Fold 8.
+>
 > **v3 ersetzt alle früheren Fassungen vollständig.** v2.x hatte die Lage des Knicks am Cover falsch
 > (Knick rechts angenommen). Neu gemessen: **Der Knick des Covers liegt links, die Kamera-Loch-Seite rechts
 > ist die freie Außenkante.** Daraus folgen andere Blur-Richtungen und vor allem der Parallaxe-Effekt
@@ -53,19 +57,19 @@ schräg von oben, helles Wallpaper). Markierung: **[gemessen]** = per Tracking/R
 ### 2.3 Formeln [abgeleitet]
 ```
 // g = 0 Knick, 1 Außenkante. BLUR_MAX ≈ 28 dp bei ~400 dp Cover-Breite (σ ≈ 3,5 % der Breite).
-// Öffnen:
-q        = clamp((θ - 2) / 38, 0, 1)
-strength = 0.3 + 0.7 * q
-front    = 1 - 1.35 * q                         // Front läuft von g=1 (außen) nach g<0 (über den Knick hinaus)
-blur(g)  = BLUR_MAX * strength * smoothstep(front - 0.35, front, g)   // unscharf außen von der Front
-// Zuklappen (Schärfe-Front vom Knick nach außen über 25° → 0°):
-s        = 1 - smoothstep(0, 25, θ)             // 0 bei ≥25°, 1 bei 0°
-front    = -0.35 + 1.35 * s
-blur(g)  = BLUR_MAX * smoothstep(front, front + 0.35, g)              // scharf innen von der Front
-dim      = 0.15 * smoothstep(3, 40, θ)         // leichte globale Abdunklung, keine Weiß-Überlagerung
+// Verlauf statt Front: Unschärfe wächst mit dem Abstand vom Knick und mit dem Winkel.
+// So arbeiten beide Nachbauten (Abschnitt 8): Radius ∝ Abstand Glas–UI-Ebene = g · sin θ.
+m        = smoothstep(0, 1, clamp((θ - 2) / 38, 0, 1))   // 0 bei 2°, 1 bei 40°; Zuklappen identisch rückwärts
+blur(g)  = BLUR_MAX * m * pow(g, 1.35)                  // Knick bleibt scharf, Außenkante am stärksten
+dark(g)  = min(1, 2 * m * pow(clamp((g - 0.2) / 0.8, 0, 1), 1.35)) * 0.35   // ab 20 % Abstand, max 35 %
+color    = blurred * (1 - dark(g))
 ```
-Prüfwerte: Öffnen θ=2° → überall scharf, θ=40° → überall voll unscharf, bei θ=15° rechts unscharf, links scharf.
-Zuklappen θ=25° → überall unscharf, θ=0° → überall scharf, bei θ=10° links scharf, rechts unscharf.
+Prüfwerte: θ=2° → überall scharf. θ=15° → rechte Spalten deutlich weich, linke Spalte fast scharf.
+θ=40° → Außenkante voll unscharf, Knickspalte nur leicht weich (Video 1, Frames 158–164: WhatsApp-Spalte
+bleibt als Form erkennbar, rechte Spalten sind Farbflecken). Zuklappen: dieselbe Funktion von θ, die
+Knickseite wird dadurch zuerst scharf, die Außenkante zuletzt.
+Hinweis: Zusätzlich zur Unschärfe gleiten die äußeren Inhalte durch die Parallaxe (Abschnitt 3) unter der
+Außenkante hinaus. Beides zusammen ergibt den Eindruck einer Front von außen nach innen.
 
 ---
 
@@ -99,7 +103,27 @@ Es wirkt, als läge das Bild auf der Ebene des Innen-Displays darunter und würd
 Weil gleichzeitig rechts neben der Außenkante das echte Innen-Panel mit identischem Layout frei wird, schließt
 der Cover-Inhalt fast nahtlos an das Innen-Display an. **Das ist der „Projektions“- bzw. Parallaxe-Eindruck.**
 
-### 3.3 Formel [abgeleitet]
+### 3.3 Formel: Strahl-Projektion [abgeleitet, gegen Messung geprüft]
+So machen es beide öffentlichen Nachbauten (Abschnitt 8): Die UI liegt auf einer **festen, flachen Ebene**, dort
+wo das Display aufgeklappt läge. Das Cover-Glas ist um den Knick um θ gedreht. Für jedes Pixel des Glases wird
+ein Strahl vom Augpunkt durch dieses Pixel bis zur UI-Ebene verlängert und dort gesampelt.
+```
+// Einheiten: Cover-Breite = 1, Knick bei 0, Außenkante bei 1. E = Augabstand, ex = Augpunkt quer.
+E  = 3.0                     // ≈ 3 Cover-Breiten (ca. 20 cm bei 65 mm Cover)
+ex = 0.0                     // Augpunkt über der Knickkante; so verankert auch chuspeeism/iphone-duo
+t  = min(θ, 75°)
+xg   = g * cos(t)            // Glaspunkt projiziert auf die Ebene
+gap  = g * sin(t)            // Abstand Glas–UI-Ebene
+f    = ex + (xg - ex) * E / (E - gap)          // Sample-Position auf der UI-Ebene
+// vertikal analog mit ey = Mitte: y_s = ey + (y - ey) * E / (E - gap)
+blurRadius ∝ gap             // passt zu 2.3 (pow(g,1.35) ist die weichere Variante)
+```
+Gegen die Messung aus 3.1 gerechnet: E = 3 und Augpunkt am Knick treffen die gemessenen Spalten im Mittel auf
++0,006 (max. 0,06). Starres Bild ohne Parallaxe läge im Mittel 0,04 daneben, Augpunkt in der Cover-Mitte 0,06.
+Die vertikale Komponente ist nicht gemessen; sie folgt aus dem Modell (Reihen rücken zur Außenkante leicht
+auseinander) und kann bei Bedarf auf 0 gesetzt werden.
+
+**Vereinfachte Alternative** (ohne Strahl, gleiche Wirkung bis ~60°):
 ```
 // Für jedes Pixel des Covers mit Anteil g (0 Knick, 1 Außenkante) wird der Inhalt an f statt an g gesampelt:
 α    = 0.45
@@ -112,6 +136,9 @@ Prüfwerte: θ=0 → f=g. θ=60°, g=1 → f=0.69, d. h. das äußere Drittel (D
 Außenkante verschwunden, die Knickspalte steht. Reihenfolge: zuerst Parallaxe-Sampling, dann Blur (2.3), dann dim.
 
 ### 3.4 Abgrenzung zu „Extra 8“
+Hinweis: Wenn Extra 8 `x` von der Außenkante misst, ist es dasselbe Prinzip wie 3.3. Am einfachsten: auf 3.3
+umstellen und den Augpunkt an die Knickkante setzen.
+
 Extra 8 sampelt mit `u = x·D/(cos a·D − (x − cx)·sin a)` (x vom Knick). Für die meisten x gilt `u > x`, der Inhalt
 wandert also **zum Knick**. Gemessen ist die Gegenrichtung: Inhalt wandert **zur Außenkante**. Außerdem beginnt
 der Effekt im Video ab dem ersten Grad, nicht erst ab 25°. Schattenbänder oben/unten sind im Video nicht zu sehen.
@@ -168,3 +195,35 @@ Zuklappen innen: dieselben Formeln (reine Funktion von θ).
 - Perspektive ist nicht herausgerechnet. Sie wirkt in die Gegenrichtung, also ist α ≥ 0,4.
 - Vertikale Parallaxe wurde nicht vermessen.
 - Zuklappen: gleiche Richtung, weniger Frames, geringere Sicherheit.
+
+---
+
+## 8. Internet-Quellen und Nachbauten (Stand 23.10.2026)
+
+Apple hat keine technische Beschreibung veröffentlicht. Alles unten stammt aus Berichten und inoffiziellen
+Nachbauten. Die Nachbauten sind die nützlichste Quelle, weil ihr Code das Modell offenlegt.
+
+- **chuspeeism/iphone-duo** (Three.js, GitHub). Baut die Animation am Apple-USDZ-Modell nach. Nur die Cover-Hälfte
+  dreht sich. Kernzeile im Shader: „Intersect the fixed front-view ray with the unfolded inner-screen plane“. Das
+  Cover-Bild ist an seiner Knickkante verankert („The outer UI stays aligned with its hinge-side left edge“).
+  Unschärfe `72 px · motion · pow(edge, 1.35)`, Abdunklung ab 20 % Abstand vom Knick mit gleicher Potenz, Blur
+  und Abdeckung werden gemeinsam gefaltet, damit Farbe weich in den schwarzen Rand ausläuft. Bestätigt: Knick
+  links, Unschärfe und Abdunklung wachsen zur Außenkante, Parallaxe durch Projektion.
+- **marcoazeem/duo-open** (Android, AGSL, GitHub). Frosted-Glass-Effekt für echte Foldables, gesteuert vom
+  Klappwinkel, ohne Root. Shader-Modell im Kopfkommentar: „UI content lives on a fixed plane: where the screen
+  would be if fully flat“, „ray eye -> glass point, continued to the UI plane“, Blur-Radius proportional zum Abstand
+  Glas–Ebene, Abdunklung proportional zum Blur, Kernel außerhalb der UI wird schwarz. Cover: Knick links
+  („spine side“), Frost am stärksten rechts. Abgeleitet von **Atomicx7/Duo-animation** (Metal → AGSL).
+- **Wichtig für Galaxy Z Fold 8** laut duo-open-README: Der öffentliche `hinge_angle`-Sensor meldet nur 0/90/180°.
+  Samsungs stetiger `folding_angle` braucht eine Systemberechtigung. duo-open liest als Umweg über Shizuku das
+  Log von Samsungs „Fold interactive“-Wallpaper (~30 Werte/s). Außerdem hält das Fold 8 normalerweise nicht beide
+  Displays gleichzeitig an. **Ohne stetige Winkelquelle ist die winkelgesteuerte Animation nicht umsetzbar.** Bitte
+  prüfen, woher `DuoFine.angle()` seine Werte bekommt.
+- **Berichte:** Macwelt beschreibt Außen-Display und linke Innenhälfte als verzerrt und unscharf, „als wäre die
+  linke Hälfte aus Glas“. ad-hoc-news nennt die Animation eine reine Software-Lösung über den Klappwinkel-Sensor,
+  iOS 27 beta liefert Foldable-APIs mit 0–180°. Notebookcheck und PhoneArena berichten, dass Samsung und andere
+  Hersteller den Effekt übernehmen. MKBHD lobt die Animationen im Test, erwähnt aber Ruckler beim Display-Wechsel.
+
+Links: github.com/chuspeeism/iphone-duo · github.com/marcoazeem/duo-open · github.com/Atomicx7/Duo-animation ·
+macwelt.de/article/3244028 · ad-hoc-news.de (Umfrage zur Falt-Animation) · notebookcheck.net (iPhone Duo opening
+animation to appear on more foldables) · phonearena.com (Galaxy Z Fold 8 Animation) · macdailynews.com (MKBHD-Review)

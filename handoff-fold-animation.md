@@ -295,6 +295,7 @@ Alle Gyro-Effekte sind additiv und klein; die Kernanimation darf sich durch Halt
 - [ ] Innen: Entschärfung fast komplett in den letzten 25° vor 180°.
 - [ ] Zuklappen: linkes Panel blurrt ab dem ersten Grad unter 180°.
 - [ ] Zuklappen Cover: kommt bei ≤40° dunkel, wird bis 8° hell, Schärfe-Sweep von außen (links) zur Hinge-Kante (rechts) über 25°→0°.
+- [ ] Zwischen 20° und 60°: Hinge-Hälfte des Covers hell und ausgewaschen (Icons über hellem Wallpaper fast weg), Außen-Hälfte mit kräftigen Farbflecken.
 - [ ] Zwischen 10° und 60°: Cover liest sich als weiche Projektion des Innen-Panels daneben (Dock an Dock, Wallpaper läuft durch, Hinge-Seite hell, Außenseite dunkler, keine dunklen Säume an den Kanten).
 - [ ] Gerät bei beliebigem Winkel anhalten → Bild friert exakt ein, nichts läuft weiter. Zurückdrehen → läuft rückwärts.
 - [ ] Aufklappen Cover: Verlauf über 2°–40°, Stärke wächst mit; bei ruckartigem Öffnen kein Sprung, nur schnell.
@@ -413,6 +414,25 @@ die Unterkante des Covers. Drei Dinge erzeugen diesen Eindruck, alle drei müsse
    (Padding ≥ Blur-Radius, Edge-Mode „clamp“, nicht „transparent“), damit Oberkante, Hinge-Kante und Unterkante
    keine dunklen Säume bekommen. Ein dunkler Saum an der Hinge-Kante würde die beiden Bilder optisch trennen
    und den Projektions-Eindruck killen. In beiden Videos läuft das Bild randlos bis an die Kante.
+
+**Frame-Serie des Auftraggebers (Video 2, Öffnen, 8 Frames von 0° bis ~90°) – was darin zu sehen ist:**
+- Frames 1–3 (0°→~15°): Blur-Front läuft von der Hinge-Kante (rechts) zur Außenkante (links). Die linke
+  Icon-Spalte (FaceTime, Mail, Siri, Shortcuts) und das Sleep-Widget sind als letztes noch scharf, während
+  Calendar-Widget, Spalten 3–4 und Dock schon Farbflecken sind. Bestätigt Abschnitt 2.
+- Frames 4–7 (~20°→60°): Cover komplett unscharf. Die **Hinge-Hälfte des Covers ist hell und ausgewaschen**:
+  Die Icons der Spalten 3–4 (Photos, Camera, Clock, Maps, Health, Wallet) verschwinden fast vollständig im
+  hellen Wallpaper, nur schwache Farbschleier bleiben. Die Außen-Hälfte behält kräftige Farbflecken (grün,
+  blau, lila) auf dunklerem Grund. Direkt neben der Hinge-Kante steht das scharfe Innen-Panel mit Dock und
+  demselben hellen Wallpaper. Dadurch liest sich die helle Cover-Hälfte als Fortsetzung/Projektion des
+  Innen-Panels. Das ist der gemeinte Effekt. Er entsteht aus Punkt 1 + 2 + Blur-Radius: Bei ~24 dp Radius
+  (σ ≈ 14 dp, ≈ 3,5 % der Cover-Breite; aus der Fleckgröße in den Frames gemessen: Icon 75 px → Fleck ~100 px
+  bei 590 px Cover-Breite) verschwimmen Icons über hellem Wallpaper praktisch komplett, über dunklem bleiben
+  sie als Flecken. Also **Blur-Radius nicht kleiner als 24 dp wählen**, sonst bleibt die Hinge-Hälfte
+  „icon-haft“ und der Projektions-Eindruck kippt.
+- Frame 8 (~90°): Cover fast kantig zur Kamera, dunkel, nur noch Farbflecken der Außen-Spalte; Innen-Panel
+  zeigt bereits scharf Calendar-Widget, Spalten 3–4 und Dock (Spalten 1–2 verdeckt, siehe 10.1).
+- In keinem der 8 Frames verschiebt sich ein Icon relativ zur Cover-Kante (linke Spalte bleibt bei ~25 %
+  der Cover-Breite). Keine Translation, nur Blur, Helligkeitsverlauf und Verdeckung.
 
 ### 10.2 Konsequenz für den Launcher
 - **Nichts bauen, was Elemente verschiebt oder skaliert.** Layout pro Panel fest verankern (rechtes Panel =

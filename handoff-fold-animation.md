@@ -1,5 +1,7 @@
 # Handoff: Fold-Animation „iPhone Duo“-Style für eigenen Launcher
 
+> **v2.4:** Abschnitt 10.3 neu: der „Projektions-Eindruck“ am Hinge-Rand des Covers (vom Auftraggeber markiert) und wie er gebaut wird. 9.2 darauf umgestellt: Verlauf wird jetzt gebaut, winkelgetrieben.
+>
 > **v2.3:** Grundregel ergänzt: **Jede Animation ist eine stetige Funktion des Hinge-Winkels θ.** Keine Timer, keine Mindestdauern, keine Nachlauf-Animationen nach dem Schließen. Cover-Blur beim Öffnen läuft jetzt über 2°–40° mit wachsender Stärke (6.3). Cover-Entschärfung beim Schließen ist auf θ gemappt (5, 6.3), die im Video gemessene Zeitkomponente steht nur noch als Beobachtung.
 >
 > **v2.2:** Neuer Abschnitt 10 (Parallaxe / Bewegung der Apps, per Tracking gemessen) und Abschnitt 11 (weitere Details aus Video 1). Abschnitt 7 (Gyro) ist auf „niedrige Priorität, optional“ zurückgestuft.
@@ -293,6 +295,7 @@ Alle Gyro-Effekte sind additiv und klein; die Kernanimation darf sich durch Halt
 - [ ] Innen: Entschärfung fast komplett in den letzten 25° vor 180°.
 - [ ] Zuklappen: linkes Panel blurrt ab dem ersten Grad unter 180°.
 - [ ] Zuklappen Cover: kommt bei ≤40° dunkel, wird bis 8° hell, Schärfe-Sweep von außen (links) zur Hinge-Kante (rechts) über 25°→0°.
+- [ ] Zwischen 10° und 60°: Cover liest sich als weiche Projektion des Innen-Panels daneben (Dock an Dock, Wallpaper läuft durch, Hinge-Seite hell, Außenseite dunkler, keine dunklen Säume an den Kanten).
 - [ ] Gerät bei beliebigem Winkel anhalten → Bild friert exakt ein, nichts läuft weiter. Zurückdrehen → läuft rückwärts.
 - [ ] Aufklappen Cover: Verlauf über 2°–40°, Stärke wächst mit; bei ruckartigem Öffnen kein Sprung, nur schnell.
 - [ ] Zuklappen Cover: Wetter-Widget scharf vor Uhr-Widget; Statusbar und Dock unter den letzten scharfen Elementen.
@@ -318,8 +321,9 @@ blurrt mit allem anderen (Abschnitt 2). Kein Flag nötig.
 - Die Außenkante ist genau die Seite, die beim Klappen von der Kamera wegkippt. Sehr wahrscheinlich ist das
   gerendertes Off-Axis-Dimming / Beleuchtung des 3D-Modells, **kein UI-Effekt**. Video 1 zeigt es nicht
   eindeutig.
-- Empfehlung: **nicht als UI nachbauen.** Falls gewünscht, als optionalen Gyro-Effekt (Abschnitt 7) mit
-  `edgeDim = 0.3 * clamp(θ / 35, 0, 1)` von der Außenkante, default aus.
+- Ob Rendering oder UI, ist aus dem Material nicht entscheidbar (Video 1 zeigt beim Öffnen die Hinge-Seite
+  dunkler, Video 2 beim Schließen die Außenseite). Der Auftraggeber will den Look aus Video 2. **Wird gebaut**,
+  winkelgetrieben, siehe 10.3 („Projektions-Verlauf“). Die Variante aus Video 1 wird nicht gebaut.
 
 ### 9.3 Cover: Blur-Onset schneller [beobachtet, Video 2]
 Blur setzt bei θ ≈ 2° ein, komplett nach ~0,25 s (θ ≈ 15°). Video 1: ~0,45 s bis ≈ 25°. In 6.3 ist die
@@ -383,6 +387,32 @@ Icons ist nachweisbar. Video 2 ist damit konsistent (Layout bei 100° identisch 
    Bildrotation + Foreshortening). Der Icon-Abstand zum Knick wirkt dadurch variabel, ist es aber nicht.
 4. **Blur-Ausbreitung.** Helle Flächen (Uhr-Widget, Notizen-gelb) wirken im Blur größer und leicht versetzt,
    weil ihr Helligkeitsschwerpunkt nach außen wandert. Keine Skalierung in der UI (siehe 9.7).
+
+### 10.3 „Projektions-Eindruck“ am Hinge-Rand des Covers [beobachtet, Video 2; vom Auftraggeber markiert]
+Während beide Screens gleichzeitig sichtbar sind (θ ≈ 10°–60°), liest sich das verschwommene Cover wie eine
+**weiche Projektion des Innendisplays**, das direkt daneben hervorschaut: Als wäre das Cover-Bild schon ein Teil
+des aufgeklappten Displays, nur noch nicht scharf. Markiert wurden die Oberkante, die Hinge-Kante (rechts) und
+die Unterkante des Covers. Drei Dinge erzeugen diesen Eindruck, alle drei müssen im Launcher stimmen:
+
+1. **Identische Komposition.** Cover-Layout = rechtes Innen-Panel, pixelgleich (Wallpaper-Ausschnitt, Widgets,
+   Grid, Dock am rechten Rand, Statusbar). Dadurch steht das blurred Dock des Covers an seiner Hinge-Kante direkt
+   neben dem scharfen Dock des Innen-Panels, und die Wallpaper-Helligkeit läuft über die Lücke weiter.
+   Abweichungen von einem Pixel im Layout zerstören den Eindruck. Das ist schon Regel aus 1.2, hier nur der Grund.
+2. **Helles Band an der Hinge-Kante, dunkler Verlauf zur Außenkante.** Die Hinge-Seite des Covers ist hell
+   (wie das Innendisplay daneben), die Außenseite grau-dunkel. Wirkt, als würde Licht des Innendisplays in das
+   Cover „überlaufen“. Winkelgetrieben, auf dem geblurrten Layer:
+   ```
+   // x = 0 Hinge-Kante, 1 Außenkante des Covers
+   k = smoothstep(5, 25, θ) * (1 - smoothstep(45, 60, θ))     // 0 bei ≤5°, voll bei 25–45°, aus ab 60°
+   projAt(x) = 1 - 0.45 * k * smoothstep(0.15, 0.8, x)        // Helligkeitsfaktor: 1.0 an der Hinge-Kante, 0.55 außen
+   // Beim Schließen dieselbe Formel (reine Funktion von θ). Multiplikativ auf coverContent nach dem Blur.
+   ```
+   Der Verlauf verschwindet beim Schließen automatisch mit θ→0, während der Schärfe-Sweep (6.3) von außen zur
+   Hinge-Kante läuft: Die Hinge-Seite ist dadurch zuletzt scharf, aber die ganze Zeit hell.
+3. **Blur ohne Clipping an den Kanten.** Der Blur-Layer muss über die Screen-Ränder hinaus gerechnet werden
+   (Padding ≥ Blur-Radius, Edge-Mode „clamp“, nicht „transparent“), damit Oberkante, Hinge-Kante und Unterkante
+   keine dunklen Säume bekommen. Ein dunkler Saum an der Hinge-Kante würde die beiden Bilder optisch trennen
+   und den Projektions-Eindruck killen. In beiden Videos läuft das Bild randlos bis an die Kante.
 
 ### 10.2 Konsequenz für den Launcher
 - **Nichts bauen, was Elemente verschiebt oder skaliert.** Layout pro Panel fest verankern (rechtes Panel =

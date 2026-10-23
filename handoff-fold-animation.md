@@ -1,5 +1,7 @@
 # Handoff: Fold-Animation „iPhone Duo“-Style für eigenen Launcher
 
+> **v2.2:** Neuer Abschnitt 10 (Parallaxe / Bewegung der Apps, per Tracking gemessen) und Abschnitt 11 (weitere Details aus Video 1). Abschnitt 7 (Gyro) ist auf „niedrige Priorität, optional“ zurückgestuft.
+>
 > **Korrektur-Hinweis (v2.1):** Die vier `smoothstep`-Formeln in 6.3 hatten vertauschte Kanten (e0 > e1). Jetzt mit `1 - smoothstep(...)` und Prüfwerten. Verhalten laut Text war schon richtig.
 >
 > **Korrektur-Hinweis (v2):** Frühere Versionen dieses Dokuments behaupteten, Statusbar und Dock des
@@ -218,7 +220,7 @@ blurAt(x) = BLUR_MAX_COVER * (1 - smoothstep(frontX - 0.35, frontX, x))   // bei
 Wenn der Nutzer vor Ende von Phase B wieder öffnet: aktuellen Blur-Zustand als Startwert übernehmen, keine Sprünge.
 
 ### 6.4 Was NICHT passiert (bewusst weglassen)
-- Kein Scale/Translate/Parallax der Icons oder Widgets.
+- Kein Scale/Translate/Parallax der Icons, Widgets, des Docks oder des Wallpapers (per Tracking bestätigt, Abschnitt 10).
 - Kein Cross-Fade zwischen zwei unterschiedlichen Layouts.
 - Keine Hinge-Linie, kein Schatten entlang der Knicklinie, keine Lichtkante.
 - **Keine Ausnahmen vom Blur auf dem Cover.** Statusbar und Dock des Covers blurren mit.
@@ -227,7 +229,7 @@ Wenn der Nutzer vor Ende von Phase B wieder öffnet: aktuellen Blur-Zustand als 
 
 ---
 
-## 7. Gyroskop / Perspektive [Extrapolation – vom Auftraggeber gewünscht]
+## 7. Gyroskop / Perspektive [Extrapolation – NIEDRIGE PRIORITÄT, optional, zuletzt bauen]
 
 In beiden Videos liegen alle Blur-Fronten und Dunkel-Verläufe parallel zur Hinge-Achse und richten sich nicht
 nach der Kamera; auch in Video 2 (schräg von oben) ändert sich daran nichts. Es gibt also **keinen** im Material
@@ -316,3 +318,74 @@ scharfer Endzustand (≤ 5 %). Das kann reine Blur-Ausbreitung sein. **Keine Ska
 ### 9.8 Was Video 2 für die Gyro-Perspektive liefert
 Nichts Zusätzliches: Auch bei schräger Kameraperspektive bleiben alle Fronten hinge-parallel. Die
 Gyro-Kopplung in Abschnitt 7 ist vollständig Extrapolation.
+
+---
+
+## 10. Parallaxe / Bewegung der Apps beim Öffnen und Schließen [gemessen, Video 1 + 2]
+
+Der Eindruck, dass die Apps beim Klappen „wandern“, ist real, aber er entsteht **nicht durch eine Verschiebung in der UI**.
+Gemessen wurde per Template-Tracking mit Gehäuse-Referenz (Bezel-Ecken + Hinge-Naht, Similarity-Fit), Residuen in px:
+
+| Phase (Video 1, Frames) | Icons / Widgets / Dock / Statusbar relativ zum Gehäuse | Wallpaper relativ zum Gehäuse |
+|---|---|---|
+| Cover geschlossen, vor dem Blur (104–137) | ±3 px (Hand-Perspektive) | ±3 px |
+| Innen rechtes Panel, Öffnen 60°→180° (172–199) | **0–2 px** | **0–2 px** |
+| Innen rechtes Panel, flach (199–220) | 0–1 px | 0–1 px |
+| Innen rechtes Panel, Schließen 180°→150° (226–262) | gleicher Verlauf wie Wallpaper, kein Unterschied | wie Icons |
+| Innen linkes Panel, flach (198–226) | Widgets 0–5 px | Wallpaper ≤ 20 px, Messung unsicher (weiche Wolken), visuell nicht erkennbar |
+| Cover nach dem Schließen (305–355) | Verschiebung vollständig durch Drehung der Hand erklärt (6°) | – |
+
+**Ergebnis: Kein Element bewegt oder skaliert sich relativ zum Panel.** Icons, Widgets, Dock, Statusbar und
+Wallpaper sind in jeder Phase pixelfest am Gehäuse. Keine iOS-artige Bewegungsparallaxe zwischen Wallpaper und
+Icons ist nachweisbar. Video 2 ist damit konsistent (Layout bei 100° identisch mit Layout bei 180°).
+
+### 10.1 Woher der Parallaxe-Eindruck kommt [beobachtet]
+1. **Verdeckung durch das schwingende Panel.** Zwischen ~60° und ~130° steht das linke Panel aus Kamerasicht
+   **vor** dem Knick und verdeckt den hinge-nächsten Streifen des rechten Panels. Video 2, θ ≈ 100°: Sleep-Widget
+   und die zwei linken Icon-Spalten (FaceTime/Calendar, Mail/Notes, Siri/TV, Shortcuts/App Store) sind komplett
+   hinter dem linken Panel verschwunden, sichtbar sind nur Calendar-Widget, Spalten 3–4 und das Dock. Video 1,
+   θ ≈ 90°: Wetter-Widget („…zig 12°“) und WhatsApp-Spalte sind am Knick angeschnitten. Beim Weiteröffnen
+   „schieben“ sich diese Spalten scheinbar aus dem Knick heraus. Das ist reine Geometrie und passiert auf einem
+   echten Foldable von selbst.
+2. **Wandernde Blur-Maskenkante (9.6).** Die hinge-nächste Spalte wird zwischen 80° und 110° von „leicht weich“
+   zu scharf. Zusammen mit (1) wirkt es, als würde die Spalte beim Öffnen „hervortreten“.
+3. **Perspektivische Stauchung.** Das rechte Panel kippt während des Klappens leicht mit (in Video 1 ~2–3°
+   Bildrotation + Foreshortening). Der Icon-Abstand zum Knick wirkt dadurch variabel, ist es aber nicht.
+4. **Blur-Ausbreitung.** Helle Flächen (Uhr-Widget, Notizen-gelb) wirken im Blur größer und leicht versetzt,
+   weil ihr Helligkeitsschwerpunkt nach außen wandert. Keine Skalierung in der UI (siehe 9.7).
+
+### 10.2 Konsequenz für den Launcher
+- **Nichts bauen, was Elemente verschiebt oder skaliert.** Layout pro Panel fest verankern (rechtes Panel =
+  Cover-Komposition, linkes Panel = Zusatz-Widgets), unabhängig von θ.
+- Die wandernde Maskenkante aus 9.6 ist der einzige Teil des „Parallaxe-Looks“, den der Launcher selbst erzeugt.
+  Sie muss drin sein, sonst wirkt der Übergang am Knick tot.
+- Verdeckung und Perspektive liefert die Hardware.
+- **Optional, nur wenn der Auftraggeber den Eindruck künstlich verstärken will** (Flag `hingeParallax`, default
+  aus): Inhalt des rechten Panels bei θ ≈ 90° um bis zu 10 dp **zum Knick hin** verschoben, linear zurück auf 0
+  bei θ ≥ 150°; Wallpaper dabei nur die Hälfte. Das reproduziert den Verdeckungseindruck, wenn die Hardware
+  ihn nicht zeigt. Nicht aus dem Video belegt.
+
+---
+
+## 11. Weitere Details aus Video 1 [beobachtet]
+
+- **Abdunklung am Cover beim Öffnen sitzt an der Hinge-Seite (rechts).** Frames 140–158: das rechte Drittel
+  des Covers (Dock, rechte Icon-Spalten, Uhr) wird mit wachsendem θ grau-dunkel, das linke Drittel (Wetter,
+  WhatsApp) bleibt hell. In Video 2 beim Schließen liegt der dunkle Verlauf an der Außenkante. Beides passt zu
+  **gerendertem Schatten/Beleuchtung des 3D-Modells** (der jeweils andere Panelkörper wirft Schatten), nicht zu
+  einem UI-Effekt. Bleibt bei „nicht nachbauen“ (9.2).
+- **Blur-Beginn liegt exakt auf dem ersten Hinge-Frame.** Frames 104–137 ist das Gerät geschlossen und wird
+  nur gehalten, Cover bleibt scharf. Frame 140 (erste sichtbare Spaltöffnung, θ ≈ 3–5°) ist der erste Frame mit
+  Blur. Kein Vorlauf, keine Verzögerung.
+- **Page-Dots** (zwei Punkte unten mittig auf dem Cover) blurren mit und verschwinden. Keine Sonderbehandlung.
+- **Badges** (rote Zähler 1/4/325) blurren mit, werden zu roten Flecken.
+- **Linke Innen-Widgets erscheinen an ihrer Endposition.** Batterie-Widget bei θ ≈ 165° (blurred) und bei 180°
+  (scharf) am selben Ort (≤ 8 px inkl. Perspektive). Kein Slide-in, kein Scale-in.
+- **Kein Overshoot.** Blur-Abbau am Innen-Screen (184–192) und Cover-Entschärfung (286–310) sind monoton.
+  Keine Feder, kein kurzes Nachblurren.
+- **Statusbar ist in beiden Modi identisch** (Uhrzeit, Batterie, WLAN oben rechts neben/unter dem Kameraloch).
+  Kein Layoutwechsel der Statusbar zwischen Cover und Innen.
+- **Hinge-Naht oben am Gehäuse** ist physisch sichtbar; auf dem flachen Innen-Screen gibt es keine sichtbare
+  Knicklinie in der UI und keine UI-Behandlung dafür.
+- **Dock-Pill** (halbtransparentes abgerundetes Rechteck) ist auf Cover und rechtem Panel identisch, keine
+  Formänderung beim Klappen.

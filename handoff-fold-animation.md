@@ -1,5 +1,7 @@
 # Handoff: Fold-Animation „iPhone Duo“-Style für eigenen Launcher
 
+> **v2.5:** Abschnitt 10.4: Soll/Ist-Vergleich des ersten Launcher-Stands bei 40° mit konkreten Korrekturen (weißer Lichtverlauf zur Hinge-Kante, Sättigung/Kontrast, Radius, Rauschen, Säume).
+>
 > **v2.4:** Abschnitt 10.3 neu: der „Projektions-Eindruck“ am Hinge-Rand des Covers (vom Auftraggeber markiert) und wie er gebaut wird. 9.2 darauf umgestellt: Verlauf wird jetzt gebaut, winkelgetrieben.
 >
 > **v2.3:** Grundregel ergänzt: **Jede Animation ist eine stetige Funktion des Hinge-Winkels θ.** Keine Timer, keine Mindestdauern, keine Nachlauf-Animationen nach dem Schließen. Cover-Blur beim Öffnen läuft jetzt über 2°–40° mit wachsender Stärke (6.3). Cover-Entschärfung beim Schließen ist auf θ gemappt (5, 6.3), die im Video gemessene Zeitkomponente steht nur noch als Beobachtung.
@@ -295,6 +297,7 @@ Alle Gyro-Effekte sind additiv und klein; die Kernanimation darf sich durch Halt
 - [ ] Innen: Entschärfung fast komplett in den letzten 25° vor 180°.
 - [ ] Zuklappen: linkes Panel blurrt ab dem ersten Grad unter 180°.
 - [ ] Zuklappen Cover: kommt bei ≤40° dunkel, wird bis 8° hell, Schärfe-Sweep von außen (links) zur Hinge-Kante (rechts) über 25°→0°.
+- [ ] Bei 40°: Hinge-Hälfte des Covers nahezu weiß, Flecken pastellig ohne dunkle Halos, kein Korn (10.4).
 - [ ] Zwischen 20° und 60°: Hinge-Hälfte des Covers hell und ausgewaschen (Icons über hellem Wallpaper fast weg), Außen-Hälfte mit kräftigen Farbflecken.
 - [ ] Zwischen 10° und 60°: Cover liest sich als weiche Projektion des Innen-Panels daneben (Dock an Dock, Wallpaper läuft durch, Hinge-Seite hell, Außenseite dunkler, keine dunklen Säume an den Kanten).
 - [ ] Gerät bei beliebigem Winkel anhalten → Bild friert exakt ein, nichts läuft weiter. Zurückdrehen → läuft rückwärts.
@@ -433,6 +436,42 @@ die Unterkante des Covers. Drei Dinge erzeugen diesen Eindruck, alle drei müsse
   zeigt bereits scharf Calendar-Widget, Spalten 3–4 und Dock (Spalten 1–2 verdeckt, siehe 10.1).
 - In keinem der 8 Frames verschiebt sich ein Icon relativ zur Cover-Kante (linke Spalte bleibt bei ~25 %
   der Cover-Breite). Keine Translation, nur Blur, Helligkeitsverlauf und Verdeckung.
+
+### 10.4 Soll/Ist-Vergleich bei ~40° (Screenshot des Launchers vs. Referenz-Frame) – was fehlt
+Der erste Launcher-Stand bei ~40° zeigt eine **gleichmäßig verwischte Kopie des Homescreens**: überall dieselbe
+Blur-Stärke, Icons als satte, kontrastreiche Farbflecken mit dunklen Halos, Wallpaper unverändert hell/dunkel,
+dazu starkes Rauschen. Kein Projektions-Eindruck. Die Referenz bei vergleichbarem Winkel ist **Milchglas mit
+Lichtverlauf**. Fünf konkrete Unterschiede, in Reihenfolge der Wirkung:
+
+1. **Lichtverlauf fehlt komplett.** Referenz: Hinge-Hälfte fast weiß ausgewaschen (Luminanz ~80 %), Außen-Hälfte
+   grau-beige (~45–55 %), Icons in der Hinge-Hälfte praktisch unsichtbar. Launcher: flache, überall gleiche
+   Helligkeit, rechte Seite sogar dunkler. Umsetzung: nach dem Blur einen **weißen Overlay-Gradient** auf den
+   Cover-Layer:
+   ```
+   // x = 0 Hinge-Kante, 1 Außenkante; k = Winkelfaktor aus 10.3 (voll bei 25–45°)
+   milk(x)  = k * (0.55 - 0.45 * smoothstep(0.10, 0.75, x))   // 0.55 an der Hinge-Kante → 0.10 außen
+   shade(x) = k * 0.12 * smoothstep(0.60, 1.00, x)             // Außenkante zusätzlich leicht abdunkeln
+   out = mix(blurred, white, milk(x)) * (1 - shade(x))
+   ```
+   Das ersetzt `projAt` aus 10.3 (dort nur Abdunklung; das Aufhellen zur Hinge-Kante ist der eigentliche Effekt).
+   **Vorher prüfen, auf welcher Seite des Cover-Screens die Hinge-Kante beim Zielgerät liegt** und x daran
+   ausrichten; im Launcher-Screenshot sieht es nach falscher Seite aus.
+2. **Kontrast und Sättigung zu hoch.** Referenz-Flecken sind pastellig und weich, keine dunklen Ränder.
+   Launcher-Flecken sind gesättigt mit dunklem Halo. Umsetzung: vor dem Overlay `saturation 0.75`, `contrast 0.85`
+   auf den geblurrten Layer; **Icon-Schatten und Label-Schatten aus der Blur-Quelle entfernen** (sie erzeugen
+   die dunklen Halos), Labels dürfen bleiben.
+3. **Blur-Radius zu klein für diesen Winkel.** Launcher-Flecken sind noch deutlich icon-förmig. Bei 40° soll
+   der volle Radius anliegen: ≥ 24 dp, eher 28–32 dp bei 400 dp Cover-Breite (σ ≈ 16–18 dp). Fleck ≈ 1,5× Icon.
+4. **Rauschen/Körnung.** Der Launcher-Screenshot hat starkes Korn über der ganzen Fläche. Referenz ist glatt.
+   Ursachen prüfen: Noise/Dither-Effekt im Material entfernen; Blur nicht auf stark reduzierter Auflösung mit
+   Nearest-Upscale rechnen (halbe Auflösung + bilinear ist ok); 8-bit-Banding-Dither ggf. nur mit ≤ 1 % Stärke.
+5. **Keine Kanten-Säume.** Im Launcher ist die Hinge-Kante neutral; mit dem Overlay aus (1) muss die Kante
+   die hellste Stelle des Covers sein, nicht eine dunkle Linie. Blur mit Padding und Edge-Mode clamp (10.3, Punkt 3).
+
+Reihenfolge der Layer-Operationen auf dem Cover: Quelle ohne Schatten → Blur(radius(θ), Maske) → saturation/
+contrast → weißer Verlauf `milk` → Abdunklung `shade` → Clipping mit Screen-Rundung. Alles Funktionen von θ.
+Erwartung nach dem Umbau: Bei 40° ist die Hinge-Hälfte fast weiß mit kaum erkennbaren Icons, die Außen-Spalte
+zeigt weiche Pastell-Flecken, und das Bild wirkt wie eine Fortsetzung des hellen Innen-Panels daneben.
 
 ### 10.2 Konsequenz für den Launcher
 - **Nichts bauen, was Elemente verschiebt oder skaliert.** Layout pro Panel fest verankern (rechtes Panel =

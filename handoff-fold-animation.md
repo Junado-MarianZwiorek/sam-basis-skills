@@ -1,5 +1,7 @@
 # Handoff: Fold-Animation „iPhone Duo“-Style für eigenen Launcher
 
+> **v2.7:** Abschnitt 12: Bewertung des Ansatzes „Extra 8“ (Scheiben-Geometrie, Schattenbänder, kubischer Blur zur Außenkante, Innen-Fenster, Timing) gegen die Videomessungen.
+>
 > **v2.6:** Abschnitt 1.1a: Spiegelregel für Geräte mit Hinge links. Alle Richtungen sind hinge-relativ; Kontrollbild: die zuerst unscharfe Seite = die helle Seite = die Seite neben dem Innen-Panel.
 >
 > **v2.5:** Abschnitt 10.4: Soll/Ist-Vergleich des ersten Launcher-Stands bei 40° mit konkreten Korrekturen (weißer Lichtverlauf zur Hinge-Kante, Sättigung/Kontrast, Radius, Rauschen, Säume).
@@ -522,3 +524,36 @@ zeigt weiche Pastell-Flecken, und das Bild wirkt wie eine Fortsetzung des hellen
   Knicklinie in der UI und keine UI-Behandlung dafür.
 - **Dock-Pill** (halbtransparentes abgerundetes Rechteck) ist auf Cover und rechtem Panel identisch, keine
   Formänderung beim Klappen.
+
+---
+
+## 12. Bewertung „Extra 8“ (Stil `duoplus13`, Shader `plus10.agsl`) gegen die Videos
+
+Grundlage: die Beschreibung der Umsetzungs-Session („Extra8-Cover-Beschreibung.md“). Bewertung pro Baustein,
+jeweils mit dem Messbefund aus Abschnitt 10/11.
+
+| Baustein Extra 8 | Befund aus den Videos | Urteil |
+|---|---|---|
+| **Scheiben-Geometrie** (`u`, `kP`): Cover-Bild wird ab 25° perspektivisch gestaucht, Spalten rücken zur Außenkante zusammen, Reihen laufen zur Mitte | Nicht vorhanden. Icons, Widgets, Dock und Wallpaper sind in jeder Phase pixelfest am Gehäuse (Residuen 0–3 px, Abschnitt 10). Die Perspektive in den Videos ist die **Kamera**, die auf ein physisch gekipptes Panel schaut. | **Falsch.** Auf einem echten Gerät kippt das Panel physisch; eine zusätzlich gerenderte Scheibe ergibt doppelte Perspektive, das Bild wirkt verzerrt und „schief“, je nach Blickwinkel in die falsche Richtung. Entfernen (`persp = 0`). |
+| **Schattenbänder oben/unten** (`edge`), zur Außenkante breiter werdend | Nicht vorhanden. Das Cover-Bild läuft in allen Frames randlos bis an Ober- und Unterkante (10.3, Punkt 3; 8-Frame-Serie). | **Falsch.** Entfernen. Schwarze Bänder zerstören zusätzlich den Projektions-Eindruck, weil sie das Cover vom Innen-Panel optisch trennen. |
+| **Blur-Verteilung** `2.6·sin(θ)·eo³`: Unschärfe wächst kubisch zur **Außenkante**, am Knick fast null | Umgekehrt. Beim Öffnen wird die **Hinge-Seite zuerst** unscharf, die Außenkante zuletzt (Abschnitt 2, 1.1a). Ab ~40° ist das Cover **überall** voll unscharf (Abschnitt 6.3), die Hinge-Hälfte sogar ausgewaschen (10.3). | **Falsch, in Richtung und Endzustand.** Durch Front-Formel aus 6.3 ersetzen (Front von der Hinge-Kante nach außen, Endzustand überall `BLUR_MAX`). Ein Blur, der am Knick dauerhaft klein bleibt, kann den Projektions-Look nicht erzeugen. |
+| `maxRadius = 4,5 % der Breite` | Gemessen σ ≈ 3,5 % der Breite (10.3), Radius ≈ 24–32 dp bei 400 dp. | **Passt**, sofern er überall erreicht wird. |
+| **Gain** `1 − 0.35·sin²θ`, mehr Abdunklung zur Außenkante, Vignette oben/unten | Richtung stimmt (Außenkante dunkler, 9.2/10.4). Aber: die **Hinge-Seite wird heller als der Ausgangszustand** (weißer Overlay 0.55, 10.4), nicht nur „weniger dunkel“. Vignette oben/unten ist im Video nicht zu sehen. | **Teilweise.** Außen-Abdunklung behalten (≈ 0.12), Vignette entfernen, weißen `milk`-Verlauf aus 10.4 ergänzen. Ohne das Aufhellen gibt es keinen Projektions-Eindruck. |
+| **Innen-Fenster** (`blurPic`: letztes Innen-Home hinter dem Frost eingeblendet) | Nicht nötig: Cover-Komposition = rechtes Innen-Panel (1.2). Die „Projektion“ entsteht aus identischem Layout + Hinge-Aufhellung, nicht aus einem zweiten Bild. | **Redundant, riskant.** Bei identischem Layout wirkungslos, bei abweichendem Layout Doppelbilder. Entfernen oder `pw = 0`. |
+| **Timing** `coverM` ab 1°, fertig bei 90° mit Potenz 2.5 | Cover ist bei ~40° voll unscharf (6.3). Die 2.5er-Potenz legt fast alles in die ersten 20°, dann passiert bis 90° nichts Sichtbares mehr. | **Zu früh, falsch verteilt.** `q = clamp((θ−2)/38, 0, 1)` linear mit `strength = 0.3 + 0.7·q` (6.3). |
+| **Innen-Nachlauf** 130 ms, Mindeststart 0,26, Höchstdauer 280 ms | Verstößt gegen Grundregel 6.0 (keine Timer, alles Funktion von θ). Im Video: Innen-Blur ist reine Winkelfunktion, fertig bei 180° (Abschnitt 3). | **Entfernen.** `p = clamp((θ−120)/60)`, `e = p³`, keine Zeitkomponente. |
+| „Der Knick ist der Fixpunkt. Alles ist eine Funktion des Winkels.“ | Fixpunkt stimmt (Layout fest, Verdeckung/Perspektive liefert die Hardware). Winkelfunktion stimmt für den Cover-Teil, nicht für den Innen-Nachlauf. | **Prinzip richtig, Umsetzung an vier Stellen gegen die Messung.** |
+
+**Kern des Missverständnisses:** Extra 8 baut die **Kamera-Perspektive des Videos** als UI-Effekt nach (Scheibe,
+Bänder, Blur außen stärker). Auf dem echten Gerät liefert die Physik diese Perspektive bereits. Die UI im Video
+tut nur drei Dinge: identisches Layout, Blur-Front vom Knick nach außen bis zur vollen Unschärfe, und
+Aufhellung zum Knick hin mit leichter Abdunklung außen. Genau das, und nichts darüber hinaus, ist zu bauen
+(Abschnitte 2, 6.3, 10.3, 10.4).
+
+**Minimaler Umbau von Extra 8 zu einem korrekten Stand:**
+1. `persp = 0`, `edge = 1`, `pw = 0` (Scheibe, Bänder, Innen-Fenster aus).
+2. Blur: `r = maxRadius · strength(θ) · (1 − smoothstep(frontX − 0.35, frontX, eo))` mit `frontX = q·1.35`,
+   `q = clamp((θ−2)/38)`, `strength = 0.3 + 0.7·q`. `eo = 0` ist die Hinge-Kante.
+3. Nach dem Blur: `saturation 0.75`, `contrast 0.85`, dann `milk(eo)` und `shade(eo)` aus 10.4.
+4. Innen: Zeitkomponenten entfernen, Formel aus 6.3.
+5. Schließen: Spiegelung nach 1.1a (Schärfe-Front von außen zum Knick, 25°→0°).

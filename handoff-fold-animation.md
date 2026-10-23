@@ -1,5 +1,7 @@
 # Handoff: Fold-Animation „iPhone Duo“-Style für eigenen Launcher
 
+> **v2.8:** 12.1 ergänzt: Perspektive aus Sicht des Menschen, Homographie-Messung am schwingenden Cover, Scheibe als Option statt Verbot.
+>
 > **v2.7:** Abschnitt 12: Bewertung des Ansatzes „Extra 8“ (Scheiben-Geometrie, Schattenbänder, kubischer Blur zur Außenkante, Innen-Fenster, Timing) gegen die Videomessungen.
 >
 > **v2.6:** Abschnitt 1.1a: Spiegelregel für Geräte mit Hinge links. Alle Richtungen sind hinge-relativ; Kontrollbild: die zuerst unscharfe Seite = die helle Seite = die Seite neben dem Innen-Panel.
@@ -534,7 +536,7 @@ jeweils mit dem Messbefund aus Abschnitt 10/11.
 
 | Baustein Extra 8 | Befund aus den Videos | Urteil |
 |---|---|---|
-| **Scheiben-Geometrie** (`u`, `kP`): Cover-Bild wird ab 25° perspektivisch gestaucht, Spalten rücken zur Außenkante zusammen, Reihen laufen zur Mitte | Nicht vorhanden. Icons, Widgets, Dock und Wallpaper sind in jeder Phase pixelfest am Gehäuse (Residuen 0–3 px, Abschnitt 10). Die Perspektive in den Videos ist die **Kamera**, die auf ein physisch gekipptes Panel schaut. | **Falsch.** Auf einem echten Gerät kippt das Panel physisch; eine zusätzlich gerenderte Scheibe ergibt doppelte Perspektive, das Bild wirkt verzerrt und „schief“, je nach Blickwinkel in die falsche Richtung. Entfernen (`persp = 0`). |
+| **Scheiben-Geometrie** (`u`, `kP`): Cover-Bild wird ab 25° perspektivisch gestaucht, Spalten rücken zur Außenkante zusammen, Reihen laufen zur Mitte | Aus Sicht des Betrachters **gibt es** diese Perspektive im Video: Das Cover-Panel schwingt und kippt physisch von der Kamera weg, die Spalten erscheinen zur Außenkante hin gestaucht. Gemessen (Homographie aus den Gehäuse-Ecken, Video 2 bei ~55°, 12.1): Die UI fügt **keine** eigene Stauchung hinzu. Die Außen-Spalte liegt sogar 4–8 % der Breite weiter außen als die starre Projektion, Extra 8 würde sie 5 % zum Knick verschieben. Messgenauigkeit ~5 %, die Richtung von Extra 8 wird nicht gestützt. | **Nicht Teil der UI, sondern der Physik.** Ob der Launcher sie emulieren soll, hängt davon ab, welche Hälfte der Nutzer beim Öffnen hält (12.1). Default: `persp = 0`. Als bewusste Option „Scheibe“ zulässig, nur wenn das Cover-Panel beim Öffnen in der Hand ruht. Wenn das Cover-Panel selbst schwingt, nie, sonst doppelte Perspektive. |
 | **Schattenbänder oben/unten** (`edge`), zur Außenkante breiter werdend | Nicht vorhanden. Das Cover-Bild läuft in allen Frames randlos bis an Ober- und Unterkante (10.3, Punkt 3; 8-Frame-Serie). | **Falsch.** Entfernen. Schwarze Bänder zerstören zusätzlich den Projektions-Eindruck, weil sie das Cover vom Innen-Panel optisch trennen. |
 | **Blur-Verteilung** `2.6·sin(θ)·eo³`: Unschärfe wächst kubisch zur **Außenkante**, am Knick fast null | Umgekehrt. Beim Öffnen wird die **Hinge-Seite zuerst** unscharf, die Außenkante zuletzt (Abschnitt 2, 1.1a). Ab ~40° ist das Cover **überall** voll unscharf (Abschnitt 6.3), die Hinge-Hälfte sogar ausgewaschen (10.3). | **Falsch, in Richtung und Endzustand.** Durch Front-Formel aus 6.3 ersetzen (Front von der Hinge-Kante nach außen, Endzustand überall `BLUR_MAX`). Ein Blur, der am Knick dauerhaft klein bleibt, kann den Projektions-Look nicht erzeugen. |
 | `maxRadius = 4,5 % der Breite` | Gemessen σ ≈ 3,5 % der Breite (10.3), Radius ≈ 24–32 dp bei 400 dp. | **Passt**, sofern er überall erreicht wird. |
@@ -544,6 +546,30 @@ jeweils mit dem Messbefund aus Abschnitt 10/11.
 | **Innen-Nachlauf** 130 ms, Mindeststart 0,26, Höchstdauer 280 ms | Verstößt gegen Grundregel 6.0 (keine Timer, alles Funktion von θ). Im Video: Innen-Blur ist reine Winkelfunktion, fertig bei 180° (Abschnitt 3). | **Entfernen.** `p = clamp((θ−120)/60)`, `e = p³`, keine Zeitkomponente. |
 | „Der Knick ist der Fixpunkt. Alles ist eine Funktion des Winkels.“ | Fixpunkt stimmt (Layout fest, Verdeckung/Perspektive liefert die Hardware). Winkelfunktion stimmt für den Cover-Teil, nicht für den Innen-Nachlauf. | **Prinzip richtig, Umsetzung an vier Stellen gegen die Messung.** |
 
+### 12.1 Perspektive aus Sicht des Menschen: Physik oder UI?
+Der Einwand „aus Sicht des Menschen ist da natürlich eine Parallaxe“ ist richtig. Im Video sieht der Betrachter
+die Cover-Spalten zur Außenkante hin zusammenrücken, die Reihen laufen zur Mitte, am Knick bleibt alles stehen.
+Genau das beschreibt Extra 8. Die Frage ist nur, **wer** diese Perspektive erzeugt:
+
+- **Messung Video 2, ~55° (Frame 86 gegen Frame 52):** Homographie aus den vier Gehäuse-Ecken des Covers
+  (TL, TR, BR gemessen, BL aus Kanten extrapoliert). Damit wird vorhergesagt, wo die Icons läge, wenn das
+  Cover-Bild starr am Panel klebt und nur die Kamera-Perspektive wirkt. Beobachtet (Außen-Spalte FaceTime,
+  Mail, Siri, Shortcuts): −4 %, −6 %, −8 %, −6,5 % der Cover-Breite **nach außen** gegenüber starr.
+  Extra 8 sagt bei 55° **+5,5 % zum Knick** voraus. Unsicherheit der Handmessung ≈ ±5 % (BL-Ecke von der Hand
+  verdeckt), aber das Vorzeichen von Extra 8 ist damit nicht vereinbar. Das rechte Innen-Panel (nicht
+  schwingend) ist auf 0–2 px starr (Abschnitt 10). Fazit: **Die Perspektive im Video ist die Kamera, die auf ein
+  physisch kippendes Panel schaut. Die UI stauchet nichts.**
+- **Was das für ein echtes Gerät bedeutet:** Der Betrachter sieht dieselbe Perspektive automatisch, **wenn das
+  Cover-Panel beim Öffnen physisch kippt**. Dann darf der Launcher nichts hinzufügen; eine gerenderte Scheibe
+  auf einem kippenden Panel ist doppelte Perspektive und wirkt je nach Blickwinkel schief.
+- **Ausnahme:** Hält der Nutzer beim Öffnen die Cover-Hälfte still in der Hand und schwingt die andere Hälfte,
+  kippt das Cover **nicht** vor seinen Augen. Dann entsteht das Video-Gefühl („Blatt kippt weg“) nur durch
+  eine Emulation. Dafür ist die Scheibe aus Extra 8 ein legitimes Werkzeug, aber als **Option**, nicht als
+  Default, mit dem echten Klappwinkel als Eingabe und ohne Schattenbänder. Auf dem Zielgerät beide Varianten
+  mit der realen Handhaltung testen; die Entscheidung ist Geschmack, nicht Messung.
+- Unabhängig davon bleiben falsch: Schattenbänder, Blur-Richtung zur Außenkante, fehlendes Aufhellen am Knick,
+  Innen-Timer. Diese Punkte entscheiden darüber, ob der Projektions-Look entsteht, nicht die Scheibe.
+
 **Kern des Missverständnisses:** Extra 8 baut die **Kamera-Perspektive des Videos** als UI-Effekt nach (Scheibe,
 Bänder, Blur außen stärker). Auf dem echten Gerät liefert die Physik diese Perspektive bereits. Die UI im Video
 tut nur drei Dinge: identisches Layout, Blur-Front vom Knick nach außen bis zur vollen Unschärfe, und
@@ -551,7 +577,7 @@ Aufhellung zum Knick hin mit leichter Abdunklung außen. Genau das, und nichts d
 (Abschnitte 2, 6.3, 10.3, 10.4).
 
 **Minimaler Umbau von Extra 8 zu einem korrekten Stand:**
-1. `persp = 0`, `edge = 1`, `pw = 0` (Scheibe, Bänder, Innen-Fenster aus).
+1. `edge = 1`, `pw = 0` (Bänder, Innen-Fenster aus). `persp` als Option: 0 wenn das Cover-Panel beim Öffnen kippt, sonst nach Geschmack (12.1).
 2. Blur: `r = maxRadius · strength(θ) · (1 − smoothstep(frontX − 0.35, frontX, eo))` mit `frontX = q·1.35`,
    `q = clamp((θ−2)/38)`, `strength = 0.3 + 0.7·q`. `eo = 0` ist die Hinge-Kante.
 3. Nach dem Blur: `saturation 0.75`, `contrast 0.85`, dann `milk(eo)` und `shade(eo)` aus 10.4.

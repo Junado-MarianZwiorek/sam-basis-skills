@@ -1,5 +1,7 @@
 # Handoff: Fold-Animation „iPhone Duo“-Style für eigenen Launcher
 
+> **v2.6:** Abschnitt 1.1a: Spiegelregel für Geräte mit Hinge links. Alle Richtungen sind hinge-relativ; Kontrollbild: die zuerst unscharfe Seite = die helle Seite = die Seite neben dem Innen-Panel.
+>
 > **v2.5:** Abschnitt 10.4: Soll/Ist-Vergleich des ersten Launcher-Stands bei 40° mit konkreten Korrekturen (weißer Lichtverlauf zur Hinge-Kante, Sättigung/Kontrast, Radius, Rauschen, Säume).
 >
 > **v2.4:** Abschnitt 10.3 neu: der „Projektions-Eindruck“ am Hinge-Rand des Covers (vom Auftraggeber markiert) und wie er gebaut wird. 9.2 darauf umgestellt: Verlauf wird jetzt gebaut, winkelgetrieben.
@@ -49,6 +51,18 @@ passt. **[Extrapolation]** = nicht im Video, vom Auftraggeber gewünscht.
   dem schwingenden Panel und daneben der rechte Teil des Innen-Screens. Das rechte Innen-Panel wird nie
   geblurrt (Abschnitt 3). Deshalb sieht man in jedem Übergangsframe ein scharfes „20:33“/WLAN und ein scharfes
   Dock **neben** dem verschwommenen Cover. Diese Elemente sind **nicht** Teil des Covers.
+
+### 1.1a Spiegelregel für Geräte mit Hinge links (z. B. Galaxy Z Fold) – WICHTIG
+Alle Richtungsangaben in diesem Dokument sind **relativ zur Hinge-Kante**, nicht „links/rechts auf dem Bild“.
+In beiden Referenzvideos liegt die Hinge-Kante des Covers **rechts**. Auf einem Gerät, dessen Cover-Hinge
+**links** liegt, ist alles horizontal zu spiegeln. Es gilt immer, geräteunabhängig:
+- **Öffnen:** Blur beginnt an der **Hinge-Kante** und läuft zur Außenkante. Die Außenkante bleibt am längsten scharf.
+- **Schließen:** Schärfe beginnt an der **Außenkante** und läuft zur Hinge-Kante. Die Hinge-Seite wird zuletzt scharf.
+- **Projektions-Verlauf (10.3/10.4):** hell an der **Hinge-Kante**, dunkler zur Außenkante.
+Kontrollbild: **Die Seite, die beim Öffnen zuerst unscharf wird, ist dieselbe Seite, die hell wird, und es ist
+die Seite, neben der das Innen-Panel auftaucht.** Wenn im Launcher die helle Seite die ist, die am längsten
+scharf bleibt, ist die Blur-Richtung gespiegelt und falsch. Genau dieser Fehler entsteht, wenn man „rechts zuerst
+unscharf“ aus dem Video 1:1 auf ein Gerät mit Hinge links überträgt. Im Video ist rechts die Hinge-Seite.
 
 ### 1.2 Layout
 - Cover-Screen: Wetter-Widget (oben links) + Uhr-Widget (oben rechts, neben Kameraloch) + 4×4 Icon-Grid +
